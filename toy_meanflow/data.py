@@ -1,3 +1,6 @@
+import torch
+from torch.utils.data import Dataset
+
 from collections.abc import Sequence
 
 def split_into_blocks(
@@ -36,16 +39,62 @@ class TokenBuffer:
     ) -> list[list[int]]:
         self._token_ids.extend(token_ids) # 不用append，append会形成嵌套列表
 
-        blocks: list[list[int]] = []
+        blocks: list[list[int]] = [] # 用来收集完整的block
 
         while len(self._token_ids) >= self.block_size:
             block = self._token_ids[:self.block_size] # 取出前 block_size 个 token
-            block.append(block)
+            blocks.append(block)
 
-            del self._token_ids[:self.block_size]
+            del self._token_ids[:self.block_size] # 在缓冲区中删除这次组成block的tokens
 
         return blocks
 
-    @property
+    @property # 可以把一个类内函数的访问方式变成像属性一样
     def remaining_token_ids(self) -> list[int]:
         return self._token_ids.copy()
+
+class BlockDataset(Dataset): # 用来把索引的block转化成tensor
+# 也叫把 block 列表包装成 PyTorch Dataset。
+    def __init__(
+        self,
+        blocks:list[list[int]], # 接受外部输入
+    ) -> None:
+        if len(blocks) == 0:
+            raise ValueError("block must not be empty")
+
+        block_size = len(blocks[0])
+        """
+        blocks = [
+        [72, 101, 108, 108, 111, 32, 77, 101],   # block 0
+        [97, 110, 70, 108, 111, 119, 33, 256],    # block 1
+        ]
+
+        len(blocks[0])就是其中一个block的长度
+        """
+
+        if block_size == 0:
+            raise ValueError("block must not be empty")
+
+        for block in blocks: # 确保所有的block等长
+            # 因为后面要根据block创建batch [batch_size, seq_len]
+            if len(block) != block_size:
+                raise ValueError(
+                    "all blocks must have the same length"
+                ) 
+
+        self._blocks = blocks # 把所有的blocks在dataset当中存下来
+        self.block_size = block_size
+
+    def __len__(self) -> int:
+        return len(self._blocks) # 这里起始存的是block的块数，之后构建的batch，也是返回这个
+
+    def __getitem__(
+        self,
+        index:int # 表示取的是第几个block
+    ) -> torch.Tensor:
+        block = self._blocks[index]
+
+        return torch.tensor(
+            block,
+            dtype=torch.long, # 转化成张量，64 位整数
+        )
