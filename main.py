@@ -1,3 +1,4 @@
+from toy_meanflow.codebook import FixedGaussianCodebook
 from toy_meanflow.config import DataConfig
 from toy_meanflow.data import (
     BlockDataset,
@@ -41,26 +42,32 @@ def main() -> None:
         num_workers=data_config.num_workers,
     )
 
-    print("Number of samples:")
-    print(len(dataset))
+    codebook = FixedGaussianCodebook(
+        vocab_size=tokenizer.vocab_size,
+        embedding_dim=16,
+        seed=42,
+    )
 
-    print("\nNumber of batches:")
-    print(len(dataloader))
+    token_batch = next(iter(dataloader))
+    continuous_batch = codebook.encode(token_batch)
 
-    for batch_index, token_batch in enumerate(dataloader):
-        print(f"\nBatch {batch_index}:")
-        print(token_batch)
+    print("Token batch:")
+    print(token_batch)
 
-        print("Shape:")
-        print(token_batch.shape)
+    print("\nToken batch shape:")
+    print(token_batch.shape)
 
-        print("Dtype:")
-        print(token_batch.dtype)
+    print("\nContinuous batch shape:")
+    print(continuous_batch.shape)
 
-        print("Decoded samples:")
+    print("\nContinuous batch dtype:")
+    print(continuous_batch.dtype)
 
-        for sample in token_batch:
-            print(repr(tokenizer.decode(sample)))
+    print("\nFirst token ID:")
+    print(token_batch[0, 0])
+
+    print("\nIts continuous vector:")
+    print(continuous_batch[0, 0])
 
 
 if __name__ == "__main__":
