@@ -3,12 +3,14 @@ import torch
 from toy_meanflow.codebook import FixedGaussianCodebook
 from toy_meanflow.config import DataConfig
 from toy_meanflow.path import build_linear_path
+from toy_meanflow.time_sampler import UniformTimeSampler
 from toy_meanflow.data import (
     BlockDataset,
     TokenBuffer,
     build_dataloader,
 )
 from toy_meanflow.tokenizer import ByteTokenizer
+torch.manual_seed(42)
 
 
 def main() -> None:
@@ -86,29 +88,54 @@ def main() -> None:
         dtype=clean.dtype,
     )
 
-    z_t, velocity = build_linear_path(
+    time_sampler = UniformTimeSampler()
+
+    random_t = time_sampler.sample(
+        batch_size=clean.shape[0],
+        device=clean.device,
+        dtype=clean.dtype,
+    )
+    random_z_t, random_velocity = build_linear_path(
         clean=clean,
         noise=noise,
-        t=t,
+        t=random_t
     )
 
-    print("\nClean shape:")
-    print(clean.shape)
 
-    print("\nNoise shape:")
-    print(noise.shape)
+    print("\nRandom time values:")
+    print(random_t)
 
-    print("\nNoisy path shape:")
-    print(z_t.shape)
+    print("\nRandom time shape:")
+    print(random_t.shape)
 
-    print("\nVelocity shape:")
-    print(velocity.shape)
+    print("\nRandom time dtype:")
+    print(random_t.dtype)
 
-    print("\nAt t=0, z_t equals clean:")
-    print(torch.allclose(z_t[0], clean[0]))
+    print("\nRandom time device:")
+    print(random_t.device)
 
-    print("\nAt t=1, z_t equals noise:")
-    print(torch.allclose(z_t[1], noise[1]))
+    print("\nAll times are at least zero:")
+    print(torch.all(random_t >= 0.0).item())
+
+    print("\nAll times are below one:")
+    print(torch.all(random_t < 1.0).item())
+
+    print("\nRandom path shape:")
+    print(random_z_t.shape)
+
+    distance_to_clean = (
+    random_z_t - clean
+    ).square().mean(dim=(1, 2))
+
+    distance_to_noise = (
+        random_z_t - noise
+    ).square().mean(dim=(1, 2))
+
+    print("\nDistance to clean:")
+    print(distance_to_clean)
+
+    print("\nDistance to noise:")
+    print(distance_to_noise)
 
 
 if __name__ == "__main__":
