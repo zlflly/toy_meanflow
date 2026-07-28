@@ -110,7 +110,7 @@ def build_dataloader(
     batch_size: int,
     shuffle: bool = True,
     num_workers: int = 0,
-) -> DataLoader:
+    ) -> DataLoader:
     """把 Dataset 包装成一个能按 batch 取数据的 DataLoader。
 
     给一个装了很多样本的 Dataset，再加上"一次取几条"的规则，
