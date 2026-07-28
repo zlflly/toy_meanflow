@@ -7,7 +7,7 @@ def main() -> None:
     data_config = DataConfig(seq_len=8)
     tokenizer = ByteTokenizer()
 
-    text = "Hello MeanFlow!"
+    text = "my name is zhaolei heihei"
     token_ids = tokenizer.encode(text)
 
     blocks = split_into_blocks(
