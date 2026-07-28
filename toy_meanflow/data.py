@@ -58,8 +58,7 @@ class TokenBuffer:
         return self._token_ids.copy()
 
 class BlockDataset(Dataset): 
-    """用来把索引的block转化成tensor
-       也叫把 block 列表包装成 PyTorch Dataset。
+    """其实就是把输入的dataset存下来（list[list[int]]，并且赋予了查看长度和索引的功能
     """
 
     def __init__(
@@ -112,14 +111,20 @@ def build_dataloader(
     shuffle: bool = True,
     num_workers: int = 0,
 ) -> DataLoader:
-    """根据数据集创建一个 PyTorch DataLoader。
+    """把 Dataset 包装成一个能按 batch 取数据的 DataLoader。
 
-    Args:
-        dataset: 需要按批次读取的数据集。
-        batch_size: 每个批次包含的样本数量。
+    给一个装了很多样本的 Dataset，再加上"一次取几条"的规则，
+    返回一个 DataLoader，之后可以用 for 循环一个一个 batch 地取数据。
 
-    Returns:
-        创建完成的 DataLoader。
+    参数：
+        dataset:已经装好所有样本的 Dataset，比如 BlockDataset。它能告诉你"总共有多少条数据"和"第 i 条数据是什么"。
+        batch_size: 每个 batch 装几条样本。比如 batch_size=2，就表示每次从 Dataset 里取 2 条，拼成一个 batch。
+        shuffle: 是否打乱顺序。True 表示每轮取数据前随机打乱，False 表示按顺序取。
+        num_workers: 额外开几个子进程帮忙读数据。0 表示只用主进程，>0 可以加快速度，但也更耗内存。
+
+    返回：
+        一个 DataLoader 对象，可以用 for 循环遍历，每次取出一个 batch。
+        例如 for batch in dataloader: 每次的 batch 形状是 (batch_size, seq_len)。
     """
     if batch_size <= 0:
         raise ValueError("batch_size must be positive")
@@ -131,3 +136,7 @@ def build_dataloader(
         num_workers = num_workers, # 表示额外使用多少个进程读取数据
         drop_last = False, # 表示不丢弃尾端，最后一个不完整的batch（也就是说不满足batch_size）也会保留
     )
+    """
+    这个的作用是，生成索引列表，然后利用BLockDataset当中的索引方法，一条一条索引出batch
+    返回一个按照索引调整好的batch，（因为有shuffle的情况），后面也方便使用iter和next方法
+    """
