@@ -15,7 +15,7 @@ class TinyVelocityModel(nn.Module):
         if hidden_dim <= 0:
             raise ValueError("hidden_dim must be positive")
 
-        self.input_projection == nn.linear(
+        self.input_projection = nn.Linear(
             data_dim,
             hidden_dim,
         )
@@ -37,7 +37,7 @@ class TinyVelocityModel(nn.Module):
         self,
         z_t: torch.Tensor,
         t: torch.Tensor,
-    ) -> torch.tensor:
+    ) -> torch.Tensor:
         if z_t.ndim != 3:
             raise ValueError("z_t must have shape [batch, length, dim]")
 
@@ -49,8 +49,10 @@ class TinyVelocityModel(nn.Module):
 
         hidden = self.input_projection(z_t)
         time_hidden = self.time_projection(t[:, None])
+        # t[:, None]之前，t的形状是[B](假如)，t[:, None]之后，t的形状就是[B, 1]
 
         hidden = hidden + time_hidden[:, None, :]
+        # time_hidden的形状是[B, H]，那么time_hidden[:, None, :]的形状就是 [B, 1, H]
         hidden = torch.tanh(hidden)
 
         velocity = self.output_projection(hidden)

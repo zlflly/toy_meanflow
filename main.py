@@ -4,6 +4,7 @@ from toy_meanflow.codebook import FixedGaussianCodebook
 from toy_meanflow.config import DataConfig
 from toy_meanflow.path import build_linear_path
 from toy_meanflow.time_sampler import UniformTimeSampler
+from toy_meanflow.model import TinyVelocityModel
 from toy_meanflow.data import (
     BlockDataset,
     TokenBuffer,
@@ -99,44 +100,37 @@ def main() -> None:
         clean=clean,
         noise=noise,
         t=random_t
+    ) 
+
+    model = TinyVelocityModel(
+        data_dim=continuous_batch.shape[-1],
+        hidden_dim=64,
     )
 
+    predicted_velocity = model(
+        z_t=random_z_t,
+        t=random_t,
+    )
 
-    print("\nRandom time values:")
-    print(random_t)
-
-    print("\nRandom time shape:")
-    print(random_t.shape)
-
-    print("\nRandom time dtype:")
-    print(random_t.dtype)
-
-    print("\nRandom time device:")
-    print(random_t.device)
-
-    print("\nAll times are at least zero:")
-    print(torch.all(random_t >= 0.0).item())
-
-    print("\nAll times are below one:")
-    print(torch.all(random_t < 1.0).item())
-
-    print("\nRandom path shape:")
+    print("\nInput z_t shape:")
     print(random_z_t.shape)
 
-    distance_to_clean = (
-    random_z_t - clean
-    ).square().mean(dim=(1, 2))
+    print("\nPredicted velocity shape:")
+    print(predicted_velocity.shape)
 
-    distance_to_noise = (
-        random_z_t - noise
-    ).square().mean(dim=(1, 2))
+    print("\nSame shape:")
+    print(
+        predicted_velocity.shape
+        == random_z_t.shape
+    )
 
-    print("\nDistance to clean:")
-    print(distance_to_clean)
-
-    print("\nDistance to noise:")
-    print(distance_to_noise)
-
+    print("\nNumber of trainable parameters:")
+    print(
+        sum(
+            parameter.numel()
+            for parameter in model.parameters()
+        )
+    )
 
 if __name__ == "__main__":
     main()
