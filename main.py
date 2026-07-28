@@ -1,56 +1,66 @@
 from toy_meanflow.config import DataConfig
-from toy_meanflow.data import BlockDataset, TokenBuffer
+from toy_meanflow.data import (
+    BlockDataset,
+    TokenBuffer,
+    build_dataloader,
+)
 from toy_meanflow.tokenizer import ByteTokenizer
 
 
 def main() -> None:
-    data_config = DataConfig(seq_len=8)
+    data_config = DataConfig(
+        seq_len=8,
+        num_workers=0,
+    )
+
     tokenizer = ByteTokenizer()
 
     buffer = TokenBuffer(
         block_size=data_config.seq_len,
     )
 
-    first_tokens = tokenizer.encode(
-        "Hello",
-        add_eos=False,
-    )
+    texts = [
+        "Hello MeanFlow!",
+        "This is a toy project.",
+        "We are learning PyTorch.",
+    ]
 
-    first_blocks = buffer.add(first_tokens)
+    all_blocks: list[list[int]] = []
 
-    second_tokens = tokenizer.encode(
-        " MeanFlow!",
-        add_eos=True,
-    )
-
-    second_blocks = buffer.add(second_tokens)
-
-    all_blocks = first_blocks + second_blocks
+    for text in texts:
+        token_ids = tokenizer.encode(text)
+        new_blocks = buffer.add(token_ids)
+        all_blocks.extend(new_blocks)
 
     dataset = BlockDataset(all_blocks)
+
+    dataloader = build_dataloader(
+        dataset=dataset,
+        batch_size=2,
+        shuffle=False,
+        num_workers=data_config.num_workers,
+    )
 
     print("Number of samples:")
     print(len(dataset))
 
-    print("\nBlock size:")
-    print(dataset.block_size)
+    print("\nNumber of batches:")
+    print(len(dataloader))
 
-    first_sample = dataset[0]
+    for batch_index, token_batch in enumerate(dataloader):
+        print(f"\nBatch {batch_index}:")
+        print(token_batch)
 
-    print("\nFirst sample:")
-    print(first_sample)
+        print("Shape:")
+        print(token_batch.shape)
 
-    print("\nFirst sample type:")
-    print(type(first_sample))
+        print("Dtype:")
+        print(token_batch.dtype)
 
-    print("\nFirst sample dtype:")
-    print(first_sample.dtype)
+        print("Decoded samples:")
 
-    print("\nFirst sample shape:")
-    print(first_sample.shape)
-
-    print("\nDecoded first sample:")
-    print(tokenizer.decode(first_sample))
+        for sample in token_batch:
+            print(repr(tokenizer.decode(sample)))
 
 
 if __name__ == "__main__":

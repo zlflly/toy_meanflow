@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class DataConfig:
+    """ 一个储存参数的类 """
     dataset_name: str = "stas/openwabtext-10k" 
     split:str = "train"
     seq_len: int = 64 # 这个之后就是data当中的block_size

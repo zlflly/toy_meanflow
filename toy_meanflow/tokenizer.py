@@ -9,6 +9,7 @@ class ByteTokenizer:
             text: str,
             add_eos: bool = True,
     ) -> list[int]:
+        '''作用是接受一串字符，编码成utf-8列表，并在最后补上eos'''
         token_ids = list(text.encode("utf-8"))
 
         if add_eos: # 默认add_eos = True

@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from collections.abc import Sequence
 
@@ -25,6 +25,9 @@ def split_into_blocks(
     return blocks
 
 class TokenBuffer:
+    """创建一个buffer容器，传入block大小，
+    使用的时候，传入编码好的token id list，如果满足`block`的大小后，返回满足的block list
+    """
     def __init__(self, block_size: int ) -> None:
         if block_size <= 0:
             raise ValueError("block_size must be positive")
@@ -33,10 +36,11 @@ class TokenBuffer:
         self._token_ids: list[int] = [] # 用来保存还没组成完整block的token
         # 开头的下划线表示这是类的内部数据
 
-    def add( # 向缓冲区内加一段新的token，如果已经组成完整的blocks，就返回
+    def add( 
         self,
         token_ids: Sequence[int],
     ) -> list[list[int]]:
+        """向缓冲区内加一段新的token，如果已经组成完整的blocks，就返回"""
         self._token_ids.extend(token_ids) # 不用append，append会形成嵌套列表
 
         blocks: list[list[int]] = [] # 用来收集完整的block
@@ -53,8 +57,11 @@ class TokenBuffer:
     def remaining_token_ids(self) -> list[int]:
         return self._token_ids.copy()
 
-class BlockDataset(Dataset): # 用来把索引的block转化成tensor
-# 也叫把 block 列表包装成 PyTorch Dataset。
+class BlockDataset(Dataset): 
+    """用来把索引的block转化成tensor
+       也叫把 block 列表包装成 PyTorch Dataset。
+    """
+
     def __init__(
         self,
         blocks:list[list[int]], # 接受外部输入
@@ -98,3 +105,29 @@ class BlockDataset(Dataset): # 用来把索引的block转化成tensor
             block,
             dtype=torch.long, # 转化成张量，64 位整数
         )
+
+def build_dataloader(
+    dataset: BlockDataset,
+    batch_size: int,
+    shuffle: bool = True,
+    num_workers: int = 0,
+) -> DataLoader:
+    """根据数据集创建一个 PyTorch DataLoader。
+
+    Args:
+        dataset: 需要按批次读取的数据集。
+        batch_size: 每个批次包含的样本数量。
+
+    Returns:
+        创建完成的 DataLoader。
+    """
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+
+    return DataLoader( # 下面都是Dataloader方法需要补充的参数
+        dataset = dataset,
+        batch_size = batch_size, # 表示一次取出多少条样本
+        shuffle = shuffle, # 决定每轮遍历是否打乱样本顺序
+        num_workers = num_workers, # 表示额外使用多少个进程读取数据
+        drop_last = False, # 表示不丢弃尾端，最后一个不完整的batch（也就是说不满足batch_size）也会保留
+    )
