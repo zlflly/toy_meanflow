@@ -70,3 +70,38 @@ def model_time_derivative(
     )
 
     return prediction, du_dt
+
+def build_meanflow_target(
+    velocity: torch.Tensor,
+    du_dt: torch.Tensor,
+    r: torch.Tensor,
+    t: torch.Tensor,
+) -> torch.Tensor:
+    r"""u_target = v_t - (t - r) * \frac{d}{dt} u_\theta"""
+    if velocity.shape != du_dt.shape:
+        raise ValueError("velocity and du_dt must have the same shape")
+
+    if r.shape != t.shape:
+        raise ValueError("r and t must have the same shape")
+
+    interval = t - r # 计算区间长度
+
+    # interval：[B]
+    # du_dt：  [B, L, D]
+    interval_view = interval.reshape(
+        interval.shape[0],
+        *([1]*(velocity.ndim - 1)),
+    )
+    # interval_view: [B, 1, 1]
+    """
+    上面这段代码相当于：
+    interval_view = interval.reshape(
+        interval.shape[0],
+        1,
+        1,
+    )
+    """
+
+    target = velocity - interval_view * du_dt
+
+    return target

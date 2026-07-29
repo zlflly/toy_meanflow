@@ -5,9 +5,7 @@ from toy_meanflow.config import DataConfig
 from toy_meanflow.path import build_linear_path
 from toy_meanflow.time_sampler import (UniformTimeSampler, UniformTimePairSampler)
 from toy_meanflow.model import TinyMeanFlowModel
-from toy_meanflow.objective import flow_matching_loss
-from toy_meanflow.objective import model_time_derivative
-
+from toy_meanflow.objective import (build_meanflow_target, model_time_derivative)
 from toy_meanflow.data import (
     BlockDataset,
     TokenBuffer,
@@ -176,35 +174,27 @@ def main() -> None:
         velocity=velocity,
     )
 
-    print("z_t shape:")
-    print(z_t.shape)
+    target = build_meanflow_target(
+        velocity=velocity,
+        du_dt=du_dt,
+        r=r,
+        t=t,
+    )
 
-    print("\nPrediction shape:")
-    print(prediction.shape)
+    print("\nVelocity shape:")
+    print(velocity.shape)
 
     print("\ndu_dt shape:")
     print(du_dt.shape)
 
-    print("\nPrediction is finite:")
-    print(torch.isfinite(prediction).all().item())
+    print("\nMeanFlow target shape:")
+    print(target.shape)
 
-    print("\ndu_dt is finite:")
-    print(torch.isfinite(du_dt).all().item())
+    print("\nTarget is finite:")
+    print(torch.isfinite(target).all().item())
 
-    direct_prediction = model(
-    z_t=z_t,
-    r=r,
-    t=t,
-    )
-
-    print("\nJVP prediction matches direct forward:")
-    print(
-        torch.allclose(
-            prediction,
-            direct_prediction,
-            atol=1e-6,
-        )
-    )
+    print("\nTarget matches prediction shape:")
+    print(target.shape == prediction.shape)
 
 if __name__ == "__main__":
     main()
