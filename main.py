@@ -167,6 +167,35 @@ def main() -> None:
     print("\nMean parameter change:")
     print(parameter_change.item())
 
+    # --- 测试 UniformTimePairSampler ---
+    pair_sampler = UniformTimePairSampler(
+        non_equal_ratio=0.75,
+    )
+
+    r, t = pair_sampler.sample(
+        batch_size=20,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+
+    print("\nr:")
+    print(r)
+
+    print("\nt:")
+    print(t)
+
+    print("\nr < t:")
+    print(r < t)
+
+    print("\nr == t:")
+    print(r == t)
+
+    print("\nNon-equal count:")
+    print((r < t).sum().item())
+
+    print("\nEqual count:")
+    print((r == t).sum().item())
+
 
 if __name__ == "__main__":
     main()
