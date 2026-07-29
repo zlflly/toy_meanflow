@@ -5,7 +5,7 @@ from toy_meanflow.config import DataConfig
 from toy_meanflow.path import build_linear_path
 from toy_meanflow.time_sampler import (UniformTimeSampler, UniformTimePairSampler)
 from toy_meanflow.model import TinyMeanFlowModel
-from toy_meanflow.objective import (build_meanflow_target, model_time_derivative)
+from toy_meanflow.objective import (build_meanflow_target, model_time_derivative, meanflow_loss)
 from toy_meanflow.data import (
     BlockDataset,
     TokenBuffer,
@@ -150,51 +150,23 @@ def main() -> None:
         non_equal_ratio=0.75,
     )
 
-    noise = torch.randn_like(
-            continuous_batch
-        )
-
-    r, t = pair_sampler.sample(
-        batch_size=continuous_batch.shape[0],
-        device=continuous_batch.device,
-        dtype=continuous_batch.dtype,
-    )
-
-    z_t, velocity = build_linear_path(
-        clean=continuous_batch,
-        noise=noise,
-        t=t,
-    )
-
-    prediction, du_dt = model_time_derivative(
+    loss = meanflow_loss(
         model=model,
-        z_t=z_t,
-        r=r,
-        t=t,
-        velocity=velocity,
+        clean=continuous_batch,
+        pair_sampler=pair_sampler,
     )
 
-    target = build_meanflow_target(
-        velocity=velocity,
-        du_dt=du_dt,
-        r=r,
-        t=t,
-    )
+    print("MeanFlow loss:")
+    print(loss)
 
-    print("\nVelocity shape:")
-    print(velocity.shape)
+    print("\nLoss shape:")
+    print(loss.shape)
 
-    print("\ndu_dt shape:")
-    print(du_dt.shape)
+    print("\nLoss is finite:")
+    print(torch.isfinite(loss).item())
 
-    print("\nMeanFlow target shape:")
-    print(target.shape)
-
-    print("\nTarget is finite:")
-    print(torch.isfinite(target).all().item())
-
-    print("\nTarget matches prediction shape:")
-    print(target.shape == prediction.shape)
+    print("\nLoss requires grad:")
+    print(loss.requires_grad)
 
 if __name__ == "__main__":
     main()

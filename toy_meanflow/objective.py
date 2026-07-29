@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from toy_meanflow.path import build_linear_path
-from toy_meanflow.time_sampler import UniformTimeSampler
+from toy_meanflow.time_sampler import (UniformTimeSampler,UniformTimePairSampler)
 
 def flow_matching_loss(
     model: nn.Module,
@@ -105,3 +105,46 @@ def build_meanflow_target(
     target = velocity - interval_view * du_dt
 
     return target
+
+def meanflow_loss(
+    model: nn.Module,
+    clean: torch.Tensor,
+    pair_sampler: UniformTimePairSampler,
+) -> torch.Tensor:
+    """内部会采噪声、采r，t时间对、计算z_t和瞬时速度、计算预测的平均速度u和du/dt、计算meanflow target、计算loss，最后返回loss"""
+    noise = torch.randn_like(clean)
+
+    r, t = pair_sampler.sample(
+        batch_size = clean.shape[0],
+        device = clean.device,
+        dtype = clean.dtype,
+    )
+
+    z_t, velocity = build_linear_path(
+        clean=clean,
+        noise=noise,
+        t=t,
+    )
+
+    predicition, du_dt = model_time_derivative(
+        model=model,
+        z_t=z_t,
+        r=r,
+        t=t,
+        velocity=velocity,
+    )
+
+    target = build_meanflow_target(
+        velocity=velocity,
+        du_dt=du_dt,
+        r=r,
+        t=t,
+    )
+
+    target= target.detach() # detach() 会保留target当前的数值，停止对这个量的梯度更新
+
+    loss = (predicition - target).square().mean() # 计算MSE，这里的target是停止梯度的
+    # 其实是先算每个位置的误差（predicition - target），然后再平方消除符号，对batch、序列长度、和连续维度全部求平均
+    # 最终返回一个零维标量
+    
+    return loss

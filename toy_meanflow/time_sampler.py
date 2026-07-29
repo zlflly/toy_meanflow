@@ -19,7 +19,7 @@ class UniformTimeSampler: # 封装成类，便于之后替换采样策略
         return t
 
 class UniformTimePairSampler:
-    """现在初始化允许传入参数`non_equal_ratio`，传入所有的时间对当中，`r≠t`的比例，默认是0.75"""
+    """现在初始化允许传入参数`non_equal_ratio`，传入所有的时间对当中，`r≠t`的比例，默认是0.75,返回r，t"""
     def __init__(
         self,
         non_equal_ratio:float = 0.75,
