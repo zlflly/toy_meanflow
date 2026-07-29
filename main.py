@@ -5,6 +5,7 @@ from toy_meanflow.config import DataConfig
 from toy_meanflow.path import build_linear_path
 from toy_meanflow.time_sampler import UniformTimeSampler
 from toy_meanflow.model import TinyVelocityModel
+from toy_meanflow.objective import flow_matching_loss
 from toy_meanflow.data import (
     BlockDataset,
     TokenBuffer,
@@ -107,30 +108,69 @@ def main() -> None:
         hidden_dim=64,
     )
 
-    predicted_velocity = model(
-        z_t=random_z_t,
-        t=random_t,
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=1e-3,
     )
 
-    print("\nInput z_t shape:")
-    print(random_z_t.shape)
+    time_sampler = UniformTimeSampler()
 
-    print("\nPredicted velocity shape:")
-    print(predicted_velocity.shape)
-
-    print("\nSame shape:")
-    print(
-        predicted_velocity.shape
-        == random_z_t.shape
+    parameter_before = (
+        model.input_projection.weight
+        .detach()
+        .clone()
     )
 
-    print("\nNumber of trainable parameters:")
-    print(
-        sum(
-            parameter.numel()
-            for parameter in model.parameters()
+    num_steps = 10000
+
+    for step in range(1, num_steps + 1):
+        optimizer.zero_grad(set_to_none=True) # 每一步都先清空梯度
+
+        loss = flow_matching_loss(
+            model=model,
+            clean=continuous_batch,
+            time_sampler=time_sampler,
         )
+
+        loss.backward()
+
+        grad_norm = torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            max_norm=1.0
+        )
+
+        optimizer.step()
+
+        if step == 1 or step % 10 == 0:
+            print(
+                f"step={step:03d} "
+                f"loss={loss.item():.6f}" # loss.item()把零维的pytorch张量变成普通的python浮点数
+            )
+
+    parameter_after = (
+    model.input_projection.weight
+    .detach()
+    .clone()
     )
+
+    parameters_changed = not torch.equal(
+        parameter_before,
+        parameter_after,
+    )
+
+    print("\nTraining loss:")
+    print(loss.item())
+
+    print("\nParameters changed:")
+    print(parameters_changed)
+
+    parameter_change = (
+    parameter_after - parameter_before
+    ).abs().mean()
+
+    print("\nMean parameter change:")
+    print(parameter_change.item())
+
 
 if __name__ == "__main__":
     main()
