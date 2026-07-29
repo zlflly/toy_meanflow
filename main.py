@@ -94,7 +94,7 @@ def main() -> None:
         grad_norm = torch.nn.utils.clip_grad_norm_(
             model.parameters(),
             max_norm=1.0,
-        )
+        ) # 梯度裁剪，
 
         optimizer.step()
 
@@ -104,6 +104,21 @@ def main() -> None:
                 f"loss={loss.item():.6f} "
                 f"grad={grad_norm.item():.6f}"
             )
+    """
+    随机采样 noise
+        ↓
+    随机采样 r、t
+        ↓
+    构造 z_t
+        ↓
+    JVP 得到 prediction 和 du_dt
+        ↓
+    构造 MeanFlow target
+        ↓
+    target.detach()
+        ↓
+    计算 MSE
+    """
 
 if __name__ == "__main__":
     main()
