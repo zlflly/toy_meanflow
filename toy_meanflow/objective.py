@@ -10,7 +10,7 @@ def flow_matching_loss(
     time_sampler: UniformTimeSampler,
     noise: torch.Tensor | None = None,
     t: torch.Tensor | None = None,
-) -> torch.tensor:
+) -> torch.Tensor:
     """这里传入的 model 只是说明是 nn.Module 对象，它其实传过来的是 TinyVelocityModel 的实例"""
     if noise is None:
         noise = torch.randn_like(clean)

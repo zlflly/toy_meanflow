@@ -17,3 +17,26 @@ class UniformTimeSampler: # 封装成类，便于之后替换采样策略
         )
 
         return t
+
+class UniformTimePairSampler:
+    def sample(
+        self,
+        batch_size: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """这里随机采样两个时间点，然后排序，小的作为r"""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+
+        pair = torch.rand(
+            batch_size,
+            2,
+            device=device,
+            dtype=dtype,
+        )
+
+        r = pair.min(dim=1).values
+        t = pair.max(dim=1).values
+
+        return r, t

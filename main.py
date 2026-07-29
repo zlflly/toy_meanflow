@@ -3,9 +3,10 @@ import torch
 from toy_meanflow.codebook import FixedGaussianCodebook
 from toy_meanflow.config import DataConfig
 from toy_meanflow.path import build_linear_path
-from toy_meanflow.time_sampler import UniformTimeSampler
+from toy_meanflow.time_sampler import (UniformTimeSampler, UniformTimePairSampler)
 from toy_meanflow.model import TinyVelocityModel
 from toy_meanflow.objective import flow_matching_loss
+
 from toy_meanflow.data import (
     BlockDataset,
     TokenBuffer,
@@ -55,30 +56,12 @@ def main() -> None:
         seed=42,
     )
 
-    token_batch = next(iter(dataloader))
+    token_batch = next(iter(dataloader)) # 现在实际进入continuous_batch当前的只有8个block当中的前两个
     """
     dataloader本身是一个DataLoader对象，不能直接取值,iter把它变成一共迭代器
     next用一次，就是提取迭代器中的下一个元素，而dataloader每次产生的是一个batch（足够数量的block）
     """
     continuous_batch = codebook.encode(token_batch)
-
-    print("Token batch:")
-    print(token_batch)
-
-    print("\nToken batch shape:")
-    print(token_batch.shape)
-
-    print("\nContinuous batch shape:")
-    print(continuous_batch.shape)
-
-    print("\nContinuous batch dtype:")
-    print(continuous_batch.dtype)
-
-    print("\nFirst token ID:")
-    print(token_batch[0, 0])
-
-    print("\nIts continuous vector:")
-    print(continuous_batch[0, 0])
 
     # --- 测试 build_linear_path ---
     clean = continuous_batch
@@ -132,7 +115,7 @@ def main() -> None:
     )
 
     # 训练循环
-    num_steps = 10000
+    num_steps = 100
 
     for step in range(1, num_steps + 1):
         optimizer.zero_grad(set_to_none=True) # 每一步都先清空梯度
