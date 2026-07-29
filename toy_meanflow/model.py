@@ -1,5 +1,101 @@
 import torch
 from torch import nn
+import math
+
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(
+        self,
+        hidden_dim: int,
+        num_heads: int, # 那么每个注意力头处理 hidden_dim // num_heads
+    ) -> None:
+        super().__init__()
+
+        if hidden_dim % num_heads != 0:
+            raise ValueError("hidden_dim must be divisible by num_heads")
+
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+
+        self.qkv_projection = nn.Linear( # 第一个参数表示输入维度，第二参数是输出维度
+            hidden_dim,
+            3 * hidden_dim,
+        )
+
+        self.output_projection = nn.Linear(
+            hidden_dim,
+            hidden_dim,
+        )
+
+    def forward(
+        self,
+        hidden: torch.Tensor,
+    ) -> torch.Tensor:
+        if hidden.ndim != 3:
+            raise ValueError("hidden must have shape [batch, length, hidden_dim]")
+
+        batch_size, sequence_length, hidden_dim = hidden.shape # 把hidden的形状，分别赋值给前面三个变量
+
+        if hidden_dim != self.hidden_dim:
+            raise ValueError("the last dimension does not match hidden_dim")
+
+        qkv = self.qkv_projection(hidden)
+
+        query, key, value = qkv.chunk( # 意思是沿着最后一个维度平均切成三份
+            chunks=3,
+            dim=-1,
+        )
+
+        query = query.reshape(
+            batch_size,
+            sequence_length,
+            self.num_heads,
+            self.head_dim,
+        )
+
+        key = key.reshape(
+            batch_size,
+            sequence_length,
+            self.num_heads,
+            self.head_dim,
+        )
+
+        value = value.reshape(
+            batch_size,
+            sequence_length,
+            self.num_heads,
+            self.head_dim,
+        )
+
+        query = query.transpose(1, 2) # 指的是把索引为1和2的维度交换，也就是从 [B, L, heads, head_dim] 变成 [B, heads, L, head_dim]
+        key = key.transpose(1, 2)
+        value = value.transpose(1, 2)
+        # [B, heads, L, head_dim]
+
+        attention_scores = (
+            query @ key.transpose(-2, -1) # 指的是把最后两个维度交换
+        ) / math.sqrt(self.head_dim)
+
+        attention_weights = torch.softmax(
+            attention_scores,
+            dim=-1,
+        )
+
+        attended = attention_weights @ value
+        # attended：[B, heads, L, head_dim]
+
+        attended = attended.transpose(1, 2)
+
+        attended = attended.reshape(
+            batch_size,
+            sequence_length,
+            self.hidden_dim,
+        )
+
+        output = self.output_projection(attended)
+
+        return output
+
 
 class TinyMeanFlowModel(nn.Module):
     def __init__(
@@ -20,7 +116,6 @@ class TinyMeanFlowModel(nn.Module):
             hidden_dim,
         )
         # 把每一个token的连续向量的维度，从data_dim扩展到hidden_dim
-        
 
         self.time_projection = nn.Linear(
             2,
@@ -66,8 +161,6 @@ class TinyMeanFlowModel(nn.Module):
         # time_hidden的形状是[B, H]，那么time_hidden[:, None, :]的形状就是 [B, 1, H]
         hidden = torch.tanh(hidden)
 
-        average_velocity = self.output_projection(
-            hidden
-        )
+        average_velocity = self.output_projection(hidden)
 
         return average_velocity
