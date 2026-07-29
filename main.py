@@ -74,99 +74,50 @@ def main() -> None:
         lr=1e-3,
     )
 
-    # --- 训练循环（暂停：等 objective 支持时间对 (r, t) 后恢复）---
-    # time_sampler = UniformTimeSampler()
-    #
-    # parameter_before = (
-    #     model.input_projection.weight
-    #     .detach()
-    #     .clone()
-    # )
-    #
-    # fixed_noise = torch.randn_like(
-    #     continuous_batch
-    # )
-    #
-    # fixed_t = torch.tensor(
-    #     [0.25, 0.75],
-    #     device=continuous_batch.device,
-    #     dtype=continuous_batch.dtype,
-    # )
-    #
-    # num_steps = 100
-    #
-    # for step in range(1, num_steps + 1):
-    #     optimizer.zero_grad(set_to_none=True) # 每一步都先清空梯度
-    #
-    #     loss = flow_matching_loss(
-    #         model=model,
-    #         clean=continuous_batch,
-    #         time_sampler=time_sampler,
-    #         noise=fixed_noise,
-    #         t=fixed_t,
-    #     )
-    #
-    #     loss.backward()
-    #
-    #     grad_norm = torch.nn.utils.clip_grad_norm_(
-    #         model.parameters(),
-    #         max_norm=1.0
-    #     )
-    #
-    #     optimizer.step()
-    #
-    #     if step == 1 or step % 10 == 0:
-    #         print(
-    #             f"step={step:03d} "
-    #             f"loss={loss.item():.6f}" # loss.item()把零维的pytorch张量变成普通的python浮点数
-    #         )
-    #
-    # parameter_after = (
-    #     model.input_projection.weight
-    #     .detach()
-    #     .clone()
-    # )
-    #
-    # parameters_changed = not torch.equal(
-    #     parameter_before,
-    #     parameter_after,
-    # )
-    #
-    # print("\nTraining loss:")
-    # print(loss.item())
-    #
-    # print("\nParameters changed:")
-    # print(parameters_changed)
-    #
-    # parameter_change = (
-    #     parameter_after - parameter_before
-    # ).abs().mean()
-    #
-    # print("\nMean parameter change:")
-    # print(parameter_change.item())
-
-    # --- 测试 MeanFlow 时间对前向传播 ---
     pair_sampler = UniformTimePairSampler(
         non_equal_ratio=0.75,
     )
 
-    loss = meanflow_loss(
-        model=model,
-        clean=continuous_batch,
-        pair_sampler=pair_sampler,
-    )
+    num_steps = 2000
 
-    print("MeanFlow loss:")
-    print(loss)
+    for step in range(1, num_steps+1):
+        optimizer.zero_grad(set_to_none=True)
 
-    print("\nLoss shape:")
-    print(loss.shape)
+        loss = meanflow_loss(
+            model=model,
+            clean=continuous_batch,
+            pair_sampler=pair_sampler,
+        )
 
-    print("\nLoss is finite:")
-    print(torch.isfinite(loss).item())
+        loss.backward()
 
-    print("\nLoss requires grad:")
-    print(loss.requires_grad)
+        grad_norm = torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            max_norm=1.0,
+        )
+
+        optimizer.step()
+
+        if step == 1 or step % 20 == 0:
+            print(
+                f"step={step:03d} "
+                f"loss={loss.item():.6f} "
+                f"grad={grad_norm.item():.6f}"
+            )
 
 if __name__ == "__main__":
     main()
+
+"""
+step=001 loss=2.118796 grad=0.876317
+step=020 loss=2.038393 grad=0.822287
+step=040 loss=1.758342 grad=0.633901
+step=060 loss=1.739841 grad=0.742398
+step=080 loss=1.769289 grad=0.616378
+step=100 loss=2.007261 grad=0.872968
+step=120 loss=1.773544 grad=0.640151
+step=140 loss=1.890278 grad=0.695220
+step=160 loss=1.719754 grad=0.717078
+step=180 loss=1.658942 grad=0.743942
+step=200 loss=1.455982 grad=0.587683 在1.5以上震荡非常厉害
+"""
