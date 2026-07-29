@@ -121,6 +121,17 @@ def main() -> None:
         .clone()
     )
 
+    fixed_noise = torch.randn_like(
+        continuous_batch
+    )
+
+    fixed_t = torch.tensor(
+        [0.25, 0.75],
+        device=continuous_batch.device,
+        dtype=continuous_batch.dtype,
+    )
+
+    # 训练循环
     num_steps = 10000
 
     for step in range(1, num_steps + 1):
@@ -130,6 +141,8 @@ def main() -> None:
             model=model,
             clean=continuous_batch,
             time_sampler=time_sampler,
+            noise=fixed_noise,
+            t=fixed_t,
         )
 
         loss.backward()
