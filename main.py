@@ -4,7 +4,7 @@ from toy_meanflow.codebook import FixedGaussianCodebook
 from toy_meanflow.config import DataConfig
 from toy_meanflow.path import build_linear_path
 from toy_meanflow.time_sampler import (UniformTimeSampler, UniformTimePairSampler)
-from toy_meanflow.model import TinyVelocityModel
+from toy_meanflow.model import TinyMeanFlowModel
 from toy_meanflow.objective import flow_matching_loss
 
 from toy_meanflow.data import (
@@ -17,6 +17,7 @@ torch.manual_seed(42)
 
 
 def main() -> None:
+    # --- 数据管线 ---
     data_config = DataConfig(
         seq_len=8,
         num_workers=0,
@@ -63,30 +64,8 @@ def main() -> None:
     """
     continuous_batch = codebook.encode(token_batch)
 
-    # --- 测试 build_linear_path ---
-    clean = continuous_batch
-
-    noise = torch.randn_like(clean)
-
-    t = torch.tensor(
-        [0.0, 1.0],
-        dtype=clean.dtype,
-    )
-
-    time_sampler = UniformTimeSampler()
-
-    random_t = time_sampler.sample(
-        batch_size=clean.shape[0],
-        device=clean.device,
-        dtype=clean.dtype,
-    )
-    random_z_t, random_velocity = build_linear_path(
-        clean=clean,
-        noise=noise,
-        t=random_t
-    ) 
-
-    model = TinyVelocityModel(
+    # --- 模型与优化器 ---
+    model = TinyMeanFlowModel(
         data_dim=continuous_batch.shape[-1],
         hidden_dim=64,
     )
@@ -96,105 +75,124 @@ def main() -> None:
         lr=1e-3,
     )
 
-    time_sampler = UniformTimeSampler()
+    # --- 训练循环（暂停：等 objective 支持时间对 (r, t) 后恢复）---
+    # time_sampler = UniformTimeSampler()
+    #
+    # parameter_before = (
+    #     model.input_projection.weight
+    #     .detach()
+    #     .clone()
+    # )
+    #
+    # fixed_noise = torch.randn_like(
+    #     continuous_batch
+    # )
+    #
+    # fixed_t = torch.tensor(
+    #     [0.25, 0.75],
+    #     device=continuous_batch.device,
+    #     dtype=continuous_batch.dtype,
+    # )
+    #
+    # num_steps = 100
+    #
+    # for step in range(1, num_steps + 1):
+    #     optimizer.zero_grad(set_to_none=True) # 每一步都先清空梯度
+    #
+    #     loss = flow_matching_loss(
+    #         model=model,
+    #         clean=continuous_batch,
+    #         time_sampler=time_sampler,
+    #         noise=fixed_noise,
+    #         t=fixed_t,
+    #     )
+    #
+    #     loss.backward()
+    #
+    #     grad_norm = torch.nn.utils.clip_grad_norm_(
+    #         model.parameters(),
+    #         max_norm=1.0
+    #     )
+    #
+    #     optimizer.step()
+    #
+    #     if step == 1 or step % 10 == 0:
+    #         print(
+    #             f"step={step:03d} "
+    #             f"loss={loss.item():.6f}" # loss.item()把零维的pytorch张量变成普通的python浮点数
+    #         )
+    #
+    # parameter_after = (
+    #     model.input_projection.weight
+    #     .detach()
+    #     .clone()
+    # )
+    #
+    # parameters_changed = not torch.equal(
+    #     parameter_before,
+    #     parameter_after,
+    # )
+    #
+    # print("\nTraining loss:")
+    # print(loss.item())
+    #
+    # print("\nParameters changed:")
+    # print(parameters_changed)
+    #
+    # parameter_change = (
+    #     parameter_after - parameter_before
+    # ).abs().mean()
+    #
+    # print("\nMean parameter change:")
+    # print(parameter_change.item())
 
-    parameter_before = (
-        model.input_projection.weight
-        .detach()
-        .clone()
-    )
-
-    fixed_noise = torch.randn_like(
-        continuous_batch
-    )
-
-    fixed_t = torch.tensor(
-        [0.25, 0.75],
-        device=continuous_batch.device,
-        dtype=continuous_batch.dtype,
-    )
-
-    # 训练循环
-    num_steps = 100
-
-    for step in range(1, num_steps + 1):
-        optimizer.zero_grad(set_to_none=True) # 每一步都先清空梯度
-
-        loss = flow_matching_loss(
-            model=model,
-            clean=continuous_batch,
-            time_sampler=time_sampler,
-            noise=fixed_noise,
-            t=fixed_t,
-        )
-
-        loss.backward()
-
-        grad_norm = torch.nn.utils.clip_grad_norm_(
-            model.parameters(),
-            max_norm=1.0
-        )
-
-        optimizer.step()
-
-        if step == 1 or step % 10 == 0:
-            print(
-                f"step={step:03d} "
-                f"loss={loss.item():.6f}" # loss.item()把零维的pytorch张量变成普通的python浮点数
-            )
-
-    parameter_after = (
-    model.input_projection.weight
-    .detach()
-    .clone()
-    )
-
-    parameters_changed = not torch.equal(
-        parameter_before,
-        parameter_after,
-    )
-
-    print("\nTraining loss:")
-    print(loss.item())
-
-    print("\nParameters changed:")
-    print(parameters_changed)
-
-    parameter_change = (
-    parameter_after - parameter_before
-    ).abs().mean()
-
-    print("\nMean parameter change:")
-    print(parameter_change.item())
-
-    # --- 测试 UniformTimePairSampler ---
+    # --- 测试 MeanFlow 时间对前向传播 ---
     pair_sampler = UniformTimePairSampler(
         non_equal_ratio=0.75,
     )
 
     r, t = pair_sampler.sample(
-        batch_size=20,
-        device=torch.device("cpu"),
-        dtype=torch.float32,
+        batch_size=continuous_batch.shape[0],
+        device=continuous_batch.device,
+        dtype=continuous_batch.dtype,
     )
 
-    print("\nr:")
-    print(r)
+    noise = torch.randn_like(
+        continuous_batch
+    )
 
-    print("\nt:")
-    print(t)
+    z_t, velocity = build_linear_path(
+        clean=continuous_batch,
+        noise=noise,
+        t=t,
+    )
 
-    print("\nr < t:")
-    print(r < t)
+    predicted_average_velocity = model(
+        z_t=z_t,
+        r=r,
+        t=t,
+    )
 
-    print("\nr == t:")
-    print(r == t)
+    print("z_t shape:")
+    print(z_t.shape)
 
-    print("\nNon-equal count:")
-    print((r < t).sum().item())
+    print("\nr shape:")
+    print(r.shape)
 
-    print("\nEqual count:")
-    print((r == t).sum().item())
+    print("\nt shape:")
+    print(t.shape)
+
+    print("\nInterval lengths:")
+    print(t - r)
+
+    print("\nPredicted average velocity shape:")
+    print(predicted_average_velocity.shape)
+
+    print("\nOutput shape matches z_t:")
+    print(
+        predicted_average_velocity.shape
+        == z_t.shape
+    )
 
 
 if __name__ == "__main__":
