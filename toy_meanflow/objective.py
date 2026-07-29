@@ -38,3 +38,35 @@ def flow_matching_loss(
     ).square().mean() # 计算均方误差，先平方，再取平均
 
     return loss
+
+def model_time_derivative(
+    model: nn.Module,
+    z_t: torch.Tensor,
+    r: torch.Tensor,
+    t: torch.Tensor,
+    velocity: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """目的是用一次前向传播，同时拿到模型输出u和du/dt"""
+    def model_function(
+        current_z_t: torch.Tensor, # current_z_t的current前缀指的是这是一个模型内部的变量，跟外界的防止混淆
+        current_r: torch.Tensor,
+        current_t: torch.Tensor,
+    ) -> torch.Tensor:
+        # torch.func.jvp要求第一个参数必须是一个纯函数，
+        return model(
+            z_t = current_z_t,
+            r=current_r,
+            t=current_t,
+        )
+
+    prediction, du_dt = torch.func.jvp( # 返回一个二元数组，一个是普通的前向输出u，一个是方向导数，du/dt
+        model_function,
+        primals=(z_t, r, t),
+        tangents=(
+            velocity,
+            torch.zeros_like(r),
+            torch.ones_like(t),
+        ),
+    )
+
+    return prediction, du_dt

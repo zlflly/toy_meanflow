@@ -6,6 +6,7 @@ from toy_meanflow.path import build_linear_path
 from toy_meanflow.time_sampler import (UniformTimeSampler, UniformTimePairSampler)
 from toy_meanflow.model import TinyMeanFlowModel
 from toy_meanflow.objective import flow_matching_loss
+from toy_meanflow.objective import model_time_derivative
 
 from toy_meanflow.data import (
     BlockDataset,
@@ -151,14 +152,14 @@ def main() -> None:
         non_equal_ratio=0.75,
     )
 
+    noise = torch.randn_like(
+            continuous_batch
+        )
+
     r, t = pair_sampler.sample(
         batch_size=continuous_batch.shape[0],
         device=continuous_batch.device,
         dtype=continuous_batch.dtype,
-    )
-
-    noise = torch.randn_like(
-        continuous_batch
     )
 
     z_t, velocity = build_linear_path(
@@ -167,33 +168,43 @@ def main() -> None:
         t=t,
     )
 
-    predicted_average_velocity = model(
+    prediction, du_dt = model_time_derivative(
+        model=model,
         z_t=z_t,
         r=r,
         t=t,
+        velocity=velocity,
     )
 
     print("z_t shape:")
     print(z_t.shape)
 
-    print("\nr shape:")
-    print(r.shape)
+    print("\nPrediction shape:")
+    print(prediction.shape)
 
-    print("\nt shape:")
-    print(t.shape)
+    print("\ndu_dt shape:")
+    print(du_dt.shape)
 
-    print("\nInterval lengths:")
-    print(t - r)
+    print("\nPrediction is finite:")
+    print(torch.isfinite(prediction).all().item())
 
-    print("\nPredicted average velocity shape:")
-    print(predicted_average_velocity.shape)
+    print("\ndu_dt is finite:")
+    print(torch.isfinite(du_dt).all().item())
 
-    print("\nOutput shape matches z_t:")
-    print(
-        predicted_average_velocity.shape
-        == z_t.shape
+    direct_prediction = model(
+    z_t=z_t,
+    r=r,
+    t=t,
     )
 
+    print("\nJVP prediction matches direct forward:")
+    print(
+        torch.allclose(
+            prediction,
+            direct_prediction,
+            atol=1e-6,
+        )
+    )
 
 if __name__ == "__main__":
     main()
